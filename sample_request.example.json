@@ -1,0 +1,62 @@
+{
+    "search": {
+        "searchId": "SEARCH-001",
+        "status": "ACTIVE",
+        "title": "검정색 가죽 지갑",
+        "description": "성남시에서 잃어버린 검정색 반지갑",
+        "category": "지갑",
+        "attributes": {
+            "color": "검정",
+            "material": "가죽"
+        },
+        "lostAt": "2026-08-20T18:00:00+09:00",
+        "locationText": "성남시 분당구",
+        "latitude": 37.382,
+        "longitude": 127.118,
+        "imagePath": null,
+        "imageUrl": null
+    },
+    "excludedItemIds": [],
+    "topK": 5,
+    "responseLimit": 10,
+    "candidates": [
+        {
+            "itemId": "FOUND-001",
+            "status": "ACTIVE",
+            "title": "검정색 가죽 반지갑",
+            "description": "카드 수납공간이 있는 검정색 지갑",
+            "category": "지갑",
+            "attributes": {
+                "color": "검정",
+                "material": "가죽"
+            },
+            "foundAt": "2026-08-22T14:00:00+09:00",
+            "locationText": "성남시 분당구 정자동",
+            "latitude": 37.366,
+            "longitude": 127.106,
+            "imagePath": "null",
+            "imageUrl": null,
+            "source": "POLICE",
+            "sourceUrl": "https://example.com/found/FOUND-001"
+        },
+        {
+            "itemId": "FOUND-002",
+            "status": "ACTIVE",
+            "title": "파란색 장우산",
+            "description": "손잡이가 검정색인 파란색 우산",
+            "category": "우산",
+            "attributes": {
+                "color": "파랑",
+                "material": "천"
+            },
+            "foundAt": "2026-08-23T12:00:00+09:00",
+            "locationText": "성남시 수정구",
+            "latitude": 37.45,
+            "longitude": 127.14,
+            "imagePath": null,
+            "imageUrl": null,
+            "source": "POLICE",
+            "sourceUrl": "https://example.com/found/FOUND-002"
+        }
+    ]
+}

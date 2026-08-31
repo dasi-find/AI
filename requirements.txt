@@ -1,0 +1,13 @@
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+python-dotenv
+sentence-transformers
+transformers
+sentencepiece
+torch
+Pillow
+numpy
+httpx
+pytest
