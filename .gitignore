@@ -3,10 +3,12 @@
 __pycache__/
 .pytest_cache/
 .cache/
-models/
-data/
+/models/
+/data/
 *.npy
 *.pt
 *.bin
 *.local.json
+smoke_test_result.json
+smoke_test_baseline.txt
 .DS_Store
