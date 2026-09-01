@@ -1,0 +1,12 @@
+.venv/
+.env
+__pycache__/
+.pytest_cache/
+.cache/
+models/
+data/
+*.npy
+*.pt
+*.bin
+*.local.json
+.DS_Store
