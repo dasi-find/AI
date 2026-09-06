@@ -1,0 +1,13 @@
+﻿text_variant,direction,evaluation,Top-1 Accuracy,Hit@5,MRR,Mean Correct Rank,Median Correct Rank,Hit@2
+item_name,text_to_image,global,0.43333333333333335,0.8,0.6062433862433863,3.2,2.0,
+item_name,text_to_image,same_category,0.5666666666666667,,0.7455555555555554,1.7333333333333334,1.0,0.8333333333333334
+item_name,image_to_text,global,0.6,0.8666666666666667,0.7158652297782733,3.5,1.0,
+item_name,image_to_text,same_category,0.7,,0.8233333333333334,1.5,1.0,0.8666666666666667
+rule_visual_text,text_to_image,global,0.5,0.9333333333333333,0.6908730158730159,2.033333333333333,1.5,
+rule_visual_text,text_to_image,same_category,0.8333333333333334,,0.9,1.3,1.0,0.9333333333333333
+rule_visual_text,image_to_text,global,0.5666666666666667,0.9,0.7214492753623188,2.8666666666666667,1.0,
+rule_visual_text,image_to_text,same_category,0.7333333333333333,,0.8583333333333333,1.3333333333333333,1.0,0.9666666666666667
+llm_visual_text,text_to_image,global,0.6,0.9333333333333333,0.7447222222222223,2.1,1.0,
+llm_visual_text,text_to_image,same_category,0.7333333333333333,,0.8583333333333333,1.3333333333333333,1.0,0.9666666666666667
+llm_visual_text,image_to_text,global,0.7,0.9,0.7891975308641975,3.1,1.0,
+llm_visual_text,image_to_text,same_category,0.7333333333333333,,0.8472222222222222,1.4,1.0,0.9
