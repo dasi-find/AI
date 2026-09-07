@@ -11,4 +11,6 @@ __pycache__/
 *.local.json
 smoke_test_result.json
 smoke_test_baseline.txt
+result_*.txt
+results/text_to_image_ranking*.json
 .DS_Store

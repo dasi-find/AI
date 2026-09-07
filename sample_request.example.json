@@ -4,6 +4,7 @@
         "status": "ACTIVE",
         "title": "검정색 가죽 지갑",
         "description": "성남시에서 잃어버린 검정색 반지갑",
+        "visualText": "검은색 가죽 소재의 직사각형 반지갑",
         "category": "지갑",
         "attributes": {
             "color": "검정",
@@ -25,6 +26,7 @@
             "status": "ACTIVE",
             "title": "검정색 가죽 반지갑",
             "description": "카드 수납공간이 있는 검정색 지갑",
+            "visualText": "검은색 가죽 반지갑, 카드 수납공간이 있음",
             "category": "지갑",
             "attributes": {
                 "color": "검정",
@@ -34,7 +36,7 @@
             "locationText": "성남시 분당구 정자동",
             "latitude": 37.366,
             "longitude": 127.106,
-            "imagePath": "null",
+            "imagePath": null,
             "imageUrl": null,
             "source": "POLICE",
             "sourceUrl": "https://example.com/found/FOUND-001"
@@ -44,6 +46,7 @@
             "status": "ACTIVE",
             "title": "파란색 장우산",
             "description": "손잡이가 검정색인 파란색 우산",
+            "visualText": "파란색 장우산, 검은색 곡선형 손잡이",
             "category": "우산",
             "attributes": {
                 "color": "파랑",
