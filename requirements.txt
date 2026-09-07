@@ -11,3 +11,4 @@ Pillow
 numpy
 httpx
 pytest
+pandas
