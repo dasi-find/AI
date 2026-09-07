@@ -9,5 +9,6 @@ sentencepiece
 torch
 Pillow
 numpy
+pandas
 httpx
 pytest
