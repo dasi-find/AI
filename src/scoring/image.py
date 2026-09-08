@@ -5,7 +5,7 @@ from pathlib import Path
 
 from PIL import Image
 import torch
-
+import numpy as np
 from src.models.siglip import SigLIP2ImageEncoder, cosine_similarity
 
 
@@ -79,4 +79,43 @@ class ImageImageScorer:
         return self.score_prepared(
             query=query,
             candidate=candidate,
+        )
+    @staticmethod
+    def score_embeddings(
+        query_embedding: np.ndarray,
+        candidate_embedding: np.ndarray,
+    ) -> float:
+    
+    #이미 계산된 두 SigLIP2 image embedding의
+    #raw cosine similarity를 반환합니다.
+
+    #주의:
+    #- 반환 범위는 [-1, 1]
+    #- 확률이 아님
+    #- 0~1 service score 변환은 여기서 하지 않음
+
+        query = np.asarray(
+            query_embedding,
+            dtype=np.float32,
+        )
+        candidate = np.asarray(
+            candidate_embedding,
+            dtype=np.float32,
+        )
+        denominator = float(
+            np.linalg.norm(query)
+            * np.linalg.norm(candidate)
+        )
+        if denominator == 0:
+            return 0.0
+        cosine = float(
+            np.dot(query, candidate)
+            / denominator
+        )
+        return float(
+            np.clip(
+                cosine,
+                -1.0,
+                1.0,
+            )
         )

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from src.models.siglip import SigLIP2Encoder
+from src.scoring.image import ImageImageScorer
 import io
 import math
 import threading
@@ -206,13 +208,12 @@ def build_search_text(
 class ModelBundle:
     def __init__(self) -> None:
         self._text_model: SentenceTransformer | None = None
-        self._image_model = None
-        self._image_processor = None
+        self._siglip_model: SigLIP2Encoder | None = None
 
         # 여러 요청이 동시에 들어와도
         # 모델을 한 번만 로딩하도록 보호합니다.
         self._text_model_lock = threading.Lock()
-        self._image_model_lock = threading.Lock()
+        self._siglip_model_lock = threading.Lock()
 
     @property
     def text_model(self) -> SentenceTransformer:
@@ -228,30 +229,21 @@ class ModelBundle:
 
         return self._text_model
 
-    def load_image_model(self) -> None:
-        if self._image_model is not None:
+    def load_siglip_model(self) -> None:
+        if self._siglip_model is not None:
             return
 
-        with self._image_model_lock:
-            if self._image_model is not None:
+        with self._siglip_model_lock:
+            if self._siglip_model is not None:
                 return
 
-            image_processor = (
-                AutoProcessor.from_pretrained(
-                    settings.image_model_name
-                )
+            siglip_model = SigLIP2Encoder(
+                model_name=settings.image_model_name,
+                device=DEVICE,
             )
-
-            image_model = AutoModel.from_pretrained(
-                settings.image_model_name
-            )
-
-            image_model.to(DEVICE)
-            image_model.eval()
 
             # 완전히 로딩된 다음 공유 변수에 저장합니다.
-            self._image_processor = image_processor
-            self._image_model = image_model
+            self._siglip_model = siglip_model
 
     @lru_cache(maxsize=50000)
     def text_embedding(
@@ -309,37 +301,19 @@ class ModelBundle:
     ) -> np.ndarray:
         image = self.open_image(reference)
 
-        self.load_image_model()
+        self.load_siglip_model()
 
-        inputs = self._image_processor(
-            images=image,
-            return_tensors="pt",
-        )
-
-        inputs = {
-            key: value.to(DEVICE)
-            for key, value in inputs.items()
-        }
-
-        with torch.no_grad():
-            features = (
-                self._image_model.get_image_features(
-                    **inputs
-                )
+        if self._siglip_model is None:
+            raise RuntimeError(
+                "SigLIP2 모델이 로드되지 않았습니다."
             )
 
-        if hasattr(features, "pooler_output"):
-            features = features.pooler_output
-
-        features = features / features.norm(
-            dim=-1,
-            keepdim=True,
-        ).clamp(min=1e-12)
+        embedding = self._siglip_model.encode_image(
+            image
+        )
 
         return (
-            features[0]
-            .detach()
-            .cpu()
+            embedding
             .numpy()
             .astype(np.float32)
         )
@@ -356,39 +330,19 @@ class ModelBundle:
                 "visualText는 빈 문자열일 수 없습니다."
             )
 
-        self.load_image_model()
+        self.load_siglip_model()
 
-        inputs = self._image_processor(
-            text=[visual_text],
-            padding="max_length",
-            truncation=True,
-            return_tensors="pt",
-        )
-
-        inputs = {
-            key: value.to(DEVICE)
-            for key, value in inputs.items()
-        }
-
-        with torch.no_grad():
-            features = (
-                self._image_model.get_text_features(
-                    **inputs
-                )
+        if self._siglip_model is None:
+            raise RuntimeError(
+                "SigLIP2 모델이 로드되지 않았습니다."
             )
 
-        if hasattr(features, "pooler_output"):
-            features = features.pooler_output
-
-        features = features / features.norm(
-            dim=-1,
-            keepdim=True,
-        ).clamp(min=1e-12)
+        embedding = self._siglip_model.encode_text(
+            visual_text
+        )
 
         return (
-            features[0]
-            .detach()
-            .cpu()
+            embedding
             .numpy()
             .astype(np.float32)
         )
@@ -428,6 +382,28 @@ def cosine_score(
 
     # 코사인 유사도의 -1~1 범위를
     # 서비스 점수용 0~1 범위로 변경합니다.
+    return (cosine + 1.0) / 2.0
+
+
+def normalize_cosine_for_services(
+    cosine: float,
+) -> float:
+    """
+    raw cosine similarity [-1, 1]을
+    현재 API의 서비스 점수 범위 [0, 1]로 변환합니다.
+
+    주의:
+    - 확률값이 아닙니다.
+    - calibration이 아니라 단순 range mapping입니다.
+    """
+    cosine = float(
+        np.clip(
+            cosine,
+            -1.0,
+            1.0,
+        )
+    )
+
     return (cosine + 1.0) / 2.0
 
 
@@ -846,9 +822,16 @@ def rank_all_items(
             query_image_vector is not None
             and candidate_image_vector is not None
         ):
-            image_similarity = cosine_score(
-                query_image_vector,
-                candidate_image_vector,
+            raw_image_similarity = (
+                ImageImageScorer.score_embeddings(
+                    query_image_vector,
+                    candidate_image_vector,
+                )
+            )
+            image_similarity = (
+                normalize_cosine_for_services(
+                    raw_image_similarity
+                )
             )
 
         candidate_visual_text_vector: (
