@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from src.models.siglip import SigLIP2Encoder
 from src.scoring.image import ImageImageScorer
+from src.scoring.cross_modal import CrossModalScorer
 import io
 import math
 import threading
@@ -865,10 +866,16 @@ def rank_all_items(
             query_visual_text_vector is not None
             and candidate_image_vector is not None
         ):
+            raw_text_to_image_similarity = (
+                CrossModalScorer.score_embeddings(
+                    image_embedding=candidate_image_vector,
+                    text_embedding=query_visual_text_vector,
+                )
+            )
+
             search_text_to_candidate_image = (
-                cosine_score(
-                    query_visual_text_vector,
-                    candidate_image_vector,
+                normalize_cosine_for_services(
+                    raw_text_to_image_similarity
                 )
             )
 
@@ -881,10 +888,16 @@ def rank_all_items(
             and candidate_visual_text_vector
             is not None
         ):
+            raw_image_to_text_similarity = (
+                CrossModalScorer.score_embeddings(
+                    image_embedding=query_image_vector,
+                    text_embedding=candidate_visual_text_vector,
+                )
+            )
+            
             search_image_to_candidate_text = (
-                cosine_score(
-                    query_image_vector,
-                    candidate_visual_text_vector,
+                normalize_cosine_for_services(
+                    raw_image_to_text_similarity
                 )
             )
 

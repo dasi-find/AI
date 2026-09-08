@@ -5,7 +5,7 @@ from pathlib import Path
 
 from PIL import Image
 import torch
-
+import numpy as np
 from src.models.siglip import SigLIP2Encoder, cosine_similarity
 
 
@@ -126,4 +126,50 @@ class CrossModalScorer:
             image=self.prepare_image_path(image_path),
             text=self.prepare_text(visual_text),
             direction="text_to_image",
+        )
+
+    @staticmethod
+    def score_embeddings(
+        image_embedding: np.ndarray,
+        text_embedding: np.ndarray,
+    ) -> float:
+        """
+        이미 계산된 SigLIP2 image/text embedding의
+        raw cosine similarity를 반환합니다.
+
+        주의:
+        - 반환 범위는 [-1, 1]
+        - 확률이 아님
+        - 서비스용 0~1 변환은 여기서 하지 않음
+        """
+
+        image = np.asarray(
+            image_embedding,
+            dtype=np.float32,
+        )
+
+        text = np.asarray(
+            text_embedding,
+            dtype=np.float32,
+        )
+
+        denominator = float(
+            np.linalg.norm(image)
+            * np.linalg.norm(text)
+        )
+
+        if denominator == 0:
+            return 0.0
+
+        cosine = float(
+            np.dot(image, text)
+            / denominator
+        )
+
+        return float(
+            np.clip(
+                cosine,
+                -1.0,
+                1.0,
+            )
         )
