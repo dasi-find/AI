@@ -29,8 +29,9 @@ class Settings(BaseSettings):
     device: str = "auto"
     dataset_dir: str | None = None
 
-    image_weight: float = 0.35
-    text_weight: float = 0.30
+    image_weight: float = 0.30
+    text_weight: float = 0.25
+    image_text_weight: float = 0.10
     attribute_weight: float = 0.20
     date_weight: float = 0.10
     location_weight: float = 0.05
@@ -74,6 +75,7 @@ class SearchItem(BaseModel):
 
     title: str | None = None
     description: str | None = None
+    visualText: str | None = None
     category: str | None = None
     attributes: dict[str, Any] = Field(
         default_factory=dict
@@ -95,6 +97,7 @@ class FoundItem(BaseModel):
 
     title: str | None = None
     description: str | None = None
+    visualText: str | None = None
     category: str | None = None
     attributes: dict[str, Any] = Field(
         default_factory=dict
@@ -304,9 +307,9 @@ class ModelBundle:
         self,
         reference: str,
     ) -> np.ndarray:
-        self.load_image_model()
-
         image = self.open_image(reference)
+
+        self.load_image_model()
 
         inputs = self._image_processor(
             images=image,
@@ -321,6 +324,55 @@ class ModelBundle:
         with torch.no_grad():
             features = (
                 self._image_model.get_image_features(
+                    **inputs
+                )
+            )
+
+        if hasattr(features, "pooler_output"):
+            features = features.pooler_output
+
+        features = features / features.norm(
+            dim=-1,
+            keepdim=True,
+        ).clamp(min=1e-12)
+
+        return (
+            features[0]
+            .detach()
+            .cpu()
+            .numpy()
+            .astype(np.float32)
+        )
+
+    @lru_cache(maxsize=50000)
+    def visual_text_embedding(
+        self,
+        visual_text: str,
+    ) -> np.ndarray:
+        visual_text = str(visual_text).strip()
+
+        if not visual_text:
+            raise ValueError(
+                "visualText는 빈 문자열일 수 없습니다."
+            )
+
+        self.load_image_model()
+
+        inputs = self._image_processor(
+            text=[visual_text],
+            padding="max_length",
+            truncation=True,
+            return_tensors="pt",
+        )
+
+        inputs = {
+            key: value.to(DEVICE)
+            for key, value in inputs.items()
+        }
+
+        with torch.no_grad():
+            features = (
+                self._image_model.get_text_features(
                     **inputs
                 )
             )
@@ -580,6 +632,50 @@ def safe_image_embedding(
         return None
 
 
+def visual_text_value(
+    item: SearchItem | FoundItem,
+) -> str | None:
+    if item.visualText is None:
+        return None
+
+    visual_text = item.visualText.strip()
+
+    return visual_text or None
+
+
+def safe_visual_text_embedding(
+    visual_text: str | None,
+) -> np.ndarray | None:
+    if not visual_text:
+        return None
+
+    try:
+        return models.visual_text_embedding(
+            visual_text
+        )
+    except Exception:
+        # 이미지-텍스트 점수는 보조 점수입니다.
+        # 모델 로딩 또는 인코딩 실패 시 다른 점수만 사용합니다.
+        return None
+
+
+def average_available_scores(
+    scores: list[float | None],
+) -> float | None:
+    available_scores = [
+        score
+        for score in scores
+        if score is not None
+    ]
+
+    if not available_scores:
+        return None
+
+    return sum(available_scores) / len(
+        available_scores
+    )
+
+
 def combine_scores(
     scores: dict[str, float | None],
     weights: dict[str, float],
@@ -617,6 +713,14 @@ def build_reasons(
     ):
         reasons.append(
             "사진의 형태와 시각적 특징이 유사합니다."
+        )
+
+    if (
+        scores["imageText"] is not None
+        and scores["imageText"] >= 0.60
+    ):
+        reasons.append(
+            "사진과 시각적 설명이 유사합니다."
         )
 
     if (
@@ -690,9 +794,14 @@ def rank_all_items(
         image_reference(query)
     )
 
+    query_visual_text = visual_text_value(query)
+    query_visual_text_vector: np.ndarray | None = None
+    query_visual_text_embedding_attempted = False
+
     weights = {
         "image": settings.image_weight,
         "text": settings.text_weight,
+        "imageText": settings.image_text_weight,
         "attribute": settings.attribute_weight,
         "date": settings.date_weight,
         "location": settings.location_weight,
@@ -742,9 +851,73 @@ def rank_all_items(
                 candidate_image_vector,
             )
 
+        candidate_visual_text_vector: (
+            np.ndarray | None
+        ) = None
+
+        if query_image_vector is not None:
+            candidate_visual_text_vector = (
+                safe_visual_text_embedding(
+                    visual_text_value(candidate)
+                )
+            )
+
+        search_text_to_candidate_image: (
+            float | None
+        ) = None
+
+        if (
+            query_visual_text is not None
+            and candidate_image_vector is not None
+        ):
+            if not query_visual_text_embedding_attempted:
+                query_visual_text_vector = (
+                    safe_visual_text_embedding(
+                        query_visual_text
+                    )
+                )
+                query_visual_text_embedding_attempted = True
+
+        if (
+            query_visual_text_vector is not None
+            and candidate_image_vector is not None
+        ):
+            search_text_to_candidate_image = (
+                cosine_score(
+                    query_visual_text_vector,
+                    candidate_image_vector,
+                )
+            )
+
+        search_image_to_candidate_text: (
+            float | None
+        ) = None
+
+        if (
+            query_image_vector is not None
+            and candidate_visual_text_vector
+            is not None
+        ):
+            search_image_to_candidate_text = (
+                cosine_score(
+                    query_image_vector,
+                    candidate_visual_text_vector,
+                )
+            )
+
+        image_text_similarity = (
+            average_available_scores(
+                [
+                    search_text_to_candidate_image,
+                    search_image_to_candidate_text,
+                ]
+            )
+        )
+
         scores = {
             "image": image_similarity,
             "text": text_similarity,
+            "imageText": image_text_similarity,
             "attribute": attribute_score(
                 query,
                 candidate,
@@ -778,6 +951,26 @@ def rank_all_items(
                         else None
                     )
                     for name, score in scores.items()
+                },
+                "imageTextDetails": {
+                    "searchTextToCandidateImage": (
+                        round(
+                            search_text_to_candidate_image,
+                            6,
+                        )
+                        if search_text_to_candidate_image
+                        is not None
+                        else None
+                    ),
+                    "searchImageToCandidateText": (
+                        round(
+                            search_image_to_candidate_text,
+                            6,
+                        )
+                        if search_image_to_candidate_text
+                        is not None
+                        else None
+                    ),
                 },
                 "reasons": build_reasons(
                     scores,
@@ -859,7 +1052,7 @@ def rank_all_items(
         "modelVersion": (
             f"siglip2:{settings.image_model_name}"
             f"|bge-m3:{settings.text_model_name}"
-            "|fixed-cosine-v0.1"
+            "|fixed-cosine-v0.2"
         ),
     }
 
@@ -870,7 +1063,7 @@ def rank_all_items(
 
 app = FastAPI(
     title="다시찾음 AI Matching Service",
-    version="0.1.0",
+    version="0.2.0",
 )
 
 
@@ -881,6 +1074,7 @@ def health() -> dict[str, Any]:
         "device": DEVICE,
         "textModel": settings.text_model_name,
         "imageModel": settings.image_model_name,
+        "imageTextWeight": settings.image_text_weight,
     }
 
 
